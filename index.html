@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#060c18">
+<title>FLIGHTLOG</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+:root {
+  --bg:      #060c18;
+  --bg2:     #091422;
+  --panel:   #0c1b30;
+  --card:    #0f2040;
+  --border:  #1a3558;
+  --accent:  #00c8ff;
+  --orange:  #ff6b35;
+  --gold:    #ffc844;
+  --green:   #00ffaa;
+  --purple:  #a855f7;
+  --text:    #d0e8ff;
+  --muted:   #4a6a90;
+  --mono:    'Share Tech Mono', monospace;
+  --display: 'Bebas Neue', sans-serif;
+  --body:    'Noto Sans SC', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:var(--body);font-size:15px;}
+
+/* Stars */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    radial-gradient(1px 1px at 15% 25%,rgba(255,255,255,.5) 0%,transparent 100%),
+    radial-gradient(1px 1px at 35% 65%,rgba(255,255,255,.3) 0%,transparent 100%),
+    radial-gradient(1px 1px at 55% 15%,rgba(255,255,255,.4) 0%,transparent 100%),
+    radial-gradient(1px 1px at 72% 80%,rgba(255,255,255,.3) 0%,transparent 100%),
+    radial-gradient(1px 1px at 88% 40%,rgba(255,255,255,.5) 0%,transparent 100%),
+    radial-gradient(1px 1px at 25% 85%,rgba(255,255,255,.2) 0%,transparent 100%),
+    radial-gradient(1px 1px at 62% 50%,rgba(255,255,255,.3) 0%,transparent 100%),
+    radial-gradient(1px 1px at 45% 35%,rgba(255,255,255,.4) 0%,transparent 100%),
+    radial-gradient(1px 1px at 80% 10%,rgba(255,255,255,.3) 0%,transparent 100%);
+}
+
+/* ── ACCOUNT SWITCHER ── */
+#accountScreen{
+  position:fixed;inset:0;z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:var(--bg);
+}
+.ac-logo{font-family:var(--display);font-size:56px;letter-spacing:8px;color:var(--accent);text-shadow:0 0 40px rgba(0,200,255,.5);margin-bottom:8px;}
+.ac-sub{font-family:var(--mono);font-size:11px;letter-spacing:4px;color:var(--muted);margin-bottom:60px;}
+.ac-label{font-family:var(--mono);font-size:10px;letter-spacing:4px;color:var(--muted);margin-bottom:20px;}
+.ac-cards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;}
+.ac-card{
+  width:160px;height:160px;
+  background:var(--panel);border:1px solid var(--border);border-radius:16px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  cursor:pointer;transition:all .25s;position:relative;overflow:hidden;
+}
+.ac-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(0,200,255,.08) 0%,transparent 70%);opacity:0;transition:opacity .25s;}
+.ac-card:hover::before{opacity:1;}
+.ac-card:hover{border-color:var(--accent);transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,.5);}
+.ac-card:active{transform:translateY(-2px);}
+.ac-avatar{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:26px;letter-spacing:2px;font-weight:400;}
+.ac-name{font-family:var(--display);font-size:22px;letter-spacing:3px;color:var(--text);}
+.ac-count{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;}
+
+/* ── HEADER ── */
+header{
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 32px;
+  background:rgba(6,12,24,.92);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+}
+.h-left{display:flex;align-items:center;gap:20px;}
+.h-logo{font-family:var(--display);font-size:28px;letter-spacing:6px;color:var(--accent);text-shadow:0 0 20px rgba(0,200,255,.4);cursor:default;}
+.h-account{
+  display:flex;align-items:center;gap:8px;
+  background:var(--panel);border:1px solid var(--border);border-radius:20px;
+  padding:5px 14px 5px 8px;cursor:pointer;transition:all .2s;
+}
+.h-account:hover{border-color:var(--accent);}
+.h-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:12px;}
+.h-aname{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--text);}
+.h-arrow{font-size:9px;color:var(--muted);}
+
+.h-stats{display:flex;gap:28px;}
+.hs{text-align:center;}
+.hs-val{font-family:var(--display);font-size:24px;color:var(--gold);letter-spacing:2px;line-height:1;}
+.hs-lbl{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-top:2px;}
+
+.h-right{display:flex;align-items:center;gap:10px;}
+.lang-tog{display:flex;background:var(--panel);border:1px solid var(--border);border-radius:20px;overflow:hidden;}
+.lang-btn{font-family:var(--mono);font-size:10px;letter-spacing:2px;padding:6px 14px;cursor:pointer;color:var(--muted);border:none;background:transparent;transition:all .2s;}
+.lang-btn.on{background:var(--accent);color:var(--bg);border-radius:18px;margin:2px;}
+
+/* ── NAV TABS ── */
+nav{
+  position:sticky;top:57px;z-index:90;
+  display:flex;padding:0 32px;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  overflow-x:auto;scrollbar-width:none;
+}
+nav::-webkit-scrollbar{display:none;}
+.tab{
+  font-family:var(--mono);font-size:11px;letter-spacing:3px;
+  color:var(--muted);padding:14px 22px;cursor:pointer;
+  border-bottom:2px solid transparent;white-space:nowrap;
+  transition:all .2s;text-transform:uppercase;
+}
+.tab:hover{color:var(--text);}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* ── MAIN ── */
+main{max-width:1400px;margin:0 auto;padding:28px 32px 60px;}
+
+/* ── SECTION HEADERS ── */
+.sec-hd{font-family:var(--mono);font-size:10px;letter-spacing:4px;color:var(--muted);margin-bottom:14px;text-transform:uppercase;}
+
+/* ── PAGES ── */
+.pg{display:none;animation:fadeUp .25s ease;}
+.pg.on{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+.stat-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  padding:20px 22px;position:relative;overflow:hidden;
+}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.3;}
+.sc-val{font-family:var(--display);font-size:44px;letter-spacing:2px;line-height:1;}
+.sc-val.c1{color:var(--accent);}
+.sc-val.c2{color:var(--orange);}
+.sc-val.c3{color:var(--gold);}
+.sc-val.c4{color:var(--green);}
+.sc-lbl{font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--muted);margin-top:6px;}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* ── TWO-COL ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:22px;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:22px;}
+
+/* ── PANEL ── */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;}
+.panel-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px 12px;border-bottom:1px solid var(--border);
+  background:rgba(0,200,255,.02);
+}
+.panel-title{font-family:var(--mono);font-size:11px;letter-spacing:3px;color:var(--accent);}
+.panel-badge{font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:3px 10px;border-radius:10px;background:rgba(0,200,255,.1);color:var(--accent);border:1px solid rgba(0,200,255,.2);}
+
+/* ── MAP ── */
+.map-wrap{background:#040d1a;position:relative;overflow:hidden;}
+#mapSvg{width:100%;height:320px;display:block;}
+.country{fill:#0c1f38;stroke:#162d4a;stroke-width:.4;transition:fill .3s;}
+.country.visited{fill:#173d6a;stroke:var(--accent);stroke-width:.7;}
+.graticule{fill:none;stroke:rgba(0,200,255,.05);stroke-width:.5;}
+.sphere{fill:#04091a;}
+.flight-arc{fill:none;stroke:var(--orange);stroke-width:1.4;opacity:.8;stroke-dasharray:5 4;animation:dash 18s linear infinite;filter:drop-shadow(0 0 3px var(--orange));}
+@keyframes dash{to{stroke-dashoffset:-200;}}
+.city-dot{fill:var(--gold);filter:drop-shadow(0 0 5px var(--gold));cursor:pointer;}
+.map-loading{display:flex;align-items:center;justify-content:center;height:320px;font-family:var(--mono);font-size:11px;letter-spacing:3px;color:var(--muted);}
+
+/* ── YEAR BARS ── */
+.ybar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.ybar-yr{font-family:var(--mono);font-size:11px;color:var(--muted);width:40px;text-align:right;}
+.ybar-track{flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;}
+.ybar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--orange));border-radius:4px;transition:width .8s cubic-bezier(.4,0,.2,1);}
+.ybar-val{font-family:var(--mono);font-size:10px;color:var(--muted);width:56px;}
+
+/* ── CONTINENT TAGS ── */
+.cont-wrap{padding:14px 20px;display:flex;flex-wrap:wrap;gap:8px;}
+.ctag{font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);color:var(--muted);transition:all .2s;}
+.ctag.v{background:rgba(0,200,255,.08);border-color:rgba(0,200,255,.4);color:var(--accent);}
+
+/* ── TABLE ── */
+table{width:100%;border-collapse:collapse;}
+th{font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--muted);text-align:left;padding:10px 18px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);text-transform:uppercase;}
+td{padding:12px 18px;font-size:13px;border-bottom:1px solid rgba(26,53,88,.5);transition:background .15s;vertical-align:middle;}
+tr:hover td{background:rgba(0,200,255,.03);}
+tr:last-child td{border-bottom:none;}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;letter-spacing:1px;}
+.b-blue{background:rgba(0,200,255,.12);color:var(--accent);border:1px solid rgba(0,200,255,.25);}
+.b-orange{background:rgba(255,107,53,.12);color:var(--orange);border:1px solid rgba(255,107,53,.25);}
+.b-gold{background:rgba(255,200,68,.12);color:var(--gold);border:1px solid rgba(255,200,68,.25);}
+.b-green{background:rgba(0,255,170,.1);color:var(--green);border:1px solid rgba(0,255,170,.2);}
+.b-purple{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.2);}
+.b-muted{background:rgba(74,106,144,.1);color:var(--muted);border:1px solid rgba(74,106,144,.2);}
+.del-btn{background:none;border:none;color:var(--muted);font-size:16px;padding:4px 8px;cursor:pointer;border-radius:6px;transition:all .15s;}
+.del-btn:hover{background:rgba(255,68,85,.1);color:#ff4455;}
+
+/* ── ALLIANCE BADGES ── */
+.al{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:2px 7px;border-radius:4px;}
+.al-star{background:rgba(0,200,255,.12);color:var(--accent);border:1px solid rgba(0,200,255,.25);}
+.al-one{background:rgba(255,107,53,.12);color:var(--orange);border:1px solid rgba(255,107,53,.25);}
+.al-sky{background:rgba(255,200,68,.12);color:var(--gold);border:1px solid rgba(255,200,68,.25);}
+.al-none{background:rgba(74,106,144,.1);color:var(--muted);border:1px solid rgba(74,106,144,.2);}
+
+/* ── FORMS ── */
+.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:22px;}
+.form-grid.two{grid-template-columns:repeat(2,1fr);}
+.fg{display:flex;flex-direction:column;gap:7px;}
+.fg.full{grid-column:1/-1;}
+.fg label{font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;}
+input,select{
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);font-family:var(--mono);font-size:13px;padding:11px 14px;
+  outline:none;transition:border-color .2s,box-shadow .2s;width:100%;
+  -webkit-appearance:none;appearance:none;
+}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,200,255,.1);}
+input::placeholder{color:var(--muted);}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234a6a90' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;}
+select option{background:var(--bg2);}
+.form-actions{padding:0 22px 22px;display:flex;gap:12px;}
+
+/* ── CABIN SELECTOR ── */
+.cabin-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.cab-opt{
+  text-align:center;padding:10px 6px;border-radius:8px;
+  font-family:var(--mono);font-size:10px;letter-spacing:1px;
+  color:var(--muted);cursor:pointer;
+  border:1px solid var(--border);background:var(--bg);
+  transition:all .2s;
+}
+.cab-opt:hover{border-color:var(--muted);}
+.cab-opt .cab-em{font-size:18px;display:block;margin-bottom:4px;}
+.cab-opt.on{border-color:var(--gold);color:var(--gold);background:rgba(255,200,68,.06);}
+
+/* ── ROUNDTRIP TOGGLE ── */
+.rt-wrap{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;}
+.rt-btn{flex:1;font-family:var(--mono);font-size:10px;letter-spacing:2px;padding:9px;text-align:center;cursor:pointer;color:var(--muted);border-radius:6px;transition:all .2s;}
+.rt-btn.on{background:var(--accent);color:var(--bg);font-weight:700;}
+
+/* ── AIRPORT INFO ── */
+.apt-info{font-family:var(--mono);font-size:10px;margin-top:5px;min-height:16px;transition:color .2s;}
+.apt-info.ok{color:var(--green);}
+.apt-info.err{color:var(--orange);}
+.dist-row{
+  display:flex;align-items:center;gap:12px;
+  background:rgba(0,255,170,.05);border:1px solid rgba(0,255,170,.15);
+  border-radius:8px;padding:12px 16px;grid-column:1/-1;
+}
+.dist-km{font-family:var(--display);font-size:28px;color:var(--green);letter-spacing:1px;}
+.dist-lbl{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);margin-top:2px;}
+.rt-badge-sm{font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:3px 9px;border-radius:6px;background:rgba(255,200,68,.12);color:var(--gold);border:1px solid rgba(255,200,68,.2);}
+
+/* ── AIRLINE INFO ROW ── */
+.airline-row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;background:rgba(0,200,255,.04);
+  border:1px solid rgba(0,200,255,.1);border-radius:8px;
+  grid-column:1/-1;
+}
+.airline-em{font-size:20px;}
+.airline-name{font-family:var(--mono);font-size:12px;color:var(--text);}
+
+/* ── BUTTONS ── */
+.btn{font-family:var(--mono);font-size:11px;letter-spacing:3px;padding:11px 22px;border:none;border-radius:8px;cursor:pointer;transition:all .2s;text-transform:uppercase;white-space:nowrap;}
+.btn:active{transform:scale(.98);}
+.btn-primary{background:var(--accent);color:var(--bg);font-weight:700;}
+.btn-primary:hover{background:#33d4ff;box-shadow:0 0 20px rgba(0,200,255,.4);}
+.btn-ghost{background:rgba(0,200,255,.08);color:var(--accent);border:1px solid rgba(0,200,255,.2);}
+.btn-ghost:hover{background:rgba(0,200,255,.14);}
+.btn-danger{background:rgba(255,68,85,.08);color:#ff4455;border:1px solid rgba(255,68,85,.2);}
+.btn-danger:hover{background:rgba(255,68,85,.15);}
+
+/* ── SUMMARY ── */
+.summ-sel{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--accent);font-family:var(--mono);font-size:10px;letter-spacing:2px;padding:6px 30px 6px 12px;cursor:pointer;}
+.summ-row{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid rgba(26,53,88,.5);}
+.summ-row:last-child{border-bottom:none;}
+.summ-em{font-size:18px;width:26px;text-align:center;flex-shrink:0;}
+.summ-body{flex:1;min-width:0;}
+.summ-name{font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.summ-track{height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:5px;}
+.summ-fill{height:100%;border-radius:3px;}
+.summ-right{text-align:right;flex-shrink:0;}
+.summ-km{font-family:var(--display);font-size:16px;color:var(--text);letter-spacing:1px;}
+.summ-ct{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;}
+
+/* ── VIDEO ── */
+.vid-year-row{display:flex;flex-wrap:wrap;gap:8px;padding:14px 20px 10px;}
+.yr-pill{font-family:var(--mono);font-size:10px;letter-spacing:2px;padding:6px 14px;border-radius:20px;cursor:pointer;background:var(--bg);border:1px solid var(--border);color:var(--muted);transition:all .2s;}
+.yr-pill:hover{border-color:var(--muted);}
+.yr-pill.on{background:rgba(0,200,255,.1);border-color:var(--accent);color:var(--accent);}
+#videoCanvas{width:100%;display:block;background:#040d1a;}
+.vid-prog{height:3px;background:var(--border);}
+.vid-prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--orange));width:0%;transition:width .1s;}
+.vid-btn-row{display:flex;gap:10px;padding:14px 20px;}
+.vbtn{font-family:var(--mono);font-size:11px;letter-spacing:2px;padding:11px 20px;border-radius:8px;cursor:pointer;transition:all .15s;border:none;}
+.vbtn:active{transform:scale(.97);}
+.vbtn-play{background:var(--accent);color:var(--bg);font-weight:700;flex:2;}
+.vbtn-play:hover{background:#33d4ff;}
+.vbtn-sec{background:var(--panel);color:var(--muted);border:1px solid var(--border);flex:1;}
+.vbtn-sec:hover{color:var(--text);}
+.vbtn-rec{background:rgba(255,107,53,.1);color:var(--orange);border:1px solid rgba(255,107,53,.25);flex:2;}
+.vbtn-rec:hover{background:rgba(255,107,53,.18);}
+.vbtn-rec.recording{background:rgba(255,68,85,.15);color:#ff4455;border-color:rgba(255,68,85,.3);}
+.rec-status{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);padding:0 20px 14px;text-align:center;}
+
+/* ── CSV IMPORT ── */
+.drop-zone{border:1px dashed var(--border);border-radius:10px;padding:36px;text-align:center;cursor:pointer;margin:20px;transition:all .2s;}
+.drop-zone:hover{border-color:var(--accent);background:rgba(0,200,255,.03);}
+.dz-icon{font-size:36px;margin-bottom:12px;opacity:.5;}
+.dz-text{font-family:var(--mono);font-size:12px;letter-spacing:2px;color:var(--muted);}
+.code-block{font-family:var(--mono);font-size:11px;line-height:1.7;padding:12px 16px;background:var(--bg);border-radius:8px;margin:8px 20px 16px;overflow-x:auto;white-space:pre;border-left:3px solid var(--accent);color:var(--accent);}
+.code-block.or{border-color:var(--orange);color:var(--orange);}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:44px;font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--muted);}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--panel);border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:11px;letter-spacing:2px;padding:10px 20px;border-radius:20px;z-index:9998;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.6);}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  header{padding:12px 20px;}
+  .h-stats{gap:16px;}
+  nav{padding:0 20px;}
+  main{padding:20px 20px 60px;}
+  .stat-grid{grid-template-columns:1fr 1fr;}
+  .two-col{grid-template-columns:1fr;}
+  .three-col{grid-template-columns:1fr;}
+  .form-grid{grid-template-columns:1fr 1fr;}
+  .h-logo{font-size:22px;}
+}
+@media(max-width:600px){
+  .h-stats{display:none;}
+  .form-grid{grid-template-columns:1fr;}
+  .cabin-grid{grid-template-columns:repeat(2,1fr);}
+}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- ══ ACCOUNT SCREEN ══ -->
+<div id="accountScreen">
+  <div class="ac-logo">FLIGHTLOG</div>
+  <div class="ac-sub">// SELECT ACCOUNT</div>
+  <div class="ac-label" id="acLabel">选择账户</div>
+  <div class="ac-cards">
+    <div class="ac-card" onclick="selectAccount('BBTG')">
+      <div class="ac-avatar" style="background:rgba(0,200,255,.15);color:var(--accent);">BG</div>
+      <div class="ac-name">BBTG</div>
+      <div class="ac-count" id="acCount-BBTG">0 flights</div>
+    </div>
+    <div class="ac-card" onclick="selectAccount('JJ')">
+      <div class="ac-avatar" style="background:rgba(255,107,53,.15);color:var(--orange);">JJ</div>
+      <div class="ac-name">JJ</div>
+      <div class="ac-count" id="acCount-JJ">0 flights</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ══ -->
+<div id="mainApp" style="display:none;">
+
+<header>
+  <div class="h-left">
+    <div class="h-logo">FLIGHTLOG</div>
+    <div class="h-account" onclick="switchAccount()">
+      <div class="h-av" id="hAv" style="background:rgba(0,200,255,.15);color:var(--accent);font-size:11px;"></div>
+      <div class="h-aname" id="hAname">—</div>
+      <div class="h-arrow">▼</div>
+    </div>
+  </div>
+  <div class="h-stats">
+    <div class="hs"><div class="hs-val" id="hC">0</div><div class="hs-lbl" data-t="countries">国家</div></div>
+    <div class="hs"><div class="hs-val" id="hCi">0</div><div class="hs-lbl" data-t="cities">城市</div></div>
+    <div class="hs"><div class="hs-val" id="hA">0</div><div class="hs-lbl" data-t="airports">机场</div></div>
+    <div class="hs"><div class="hs-val" id="hKm">0</div><div class="hs-lbl" data-t="km">万KM</div></div>
+  </div>
+  <div class="h-right">
+    <div class="lang-tog">
+      <button class="lang-btn on" id="lzh" onclick="setLang('zh')">中文</button>
+      <button class="lang-btn" id="len" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <div class="tab on" onclick="showTab('overview')" data-t="nav_overview">概览</div>
+  <div class="tab" onclick="showTab('cities')" data-t="nav_cities">城市</div>
+  <div class="tab" onclick="showTab('flights')" data-t="nav_flights">航班</div>
+  <div class="tab" onclick="showTab('add')" data-t="nav_add">添加</div>
+  <div class="tab" onclick="showTab('video')" data-t="nav_video">飞行视频</div>
+  <div class="tab" onclick="showTab('import')" data-t="nav_import">导入</div>
+</nav>
+
+<main>
+
+<!-- ══ OVERVIEW ══ -->
+<div class="pg on" id="pg-overview">
+  <div class="stat-grid">
+    <div class="stat-card"><div class="sc-val c1" id="sC">0</div><div class="sc-lbl" data-t="countries_visited">去过的国家</div><div class="sc-sub" id="sCSub">—</div></div>
+    <div class="stat-card"><div class="sc-val c2" id="sCi">0</div><div class="sc-lbl" data-t="cities_exp">城市</div><div class="sc-sub" id="sCiSub">—</div></div>
+    <div class="stat-card"><div class="sc-val c3" id="sA">0</div><div class="sc-lbl" data-t="airports_used">机场</div><div class="sc-sub" id="sASub">—</div></div>
+    <div class="stat-card"><div class="sc-val c4" id="sKm">0</div><div class="sc-lbl" id="sKmLbl" data-t="km_flown">飞行公里</div><div class="sc-sub" id="sKmSub">—</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-hd"><span class="panel-title" data-t="flight_map">飞行轨迹地图</span></div>
+    <div class="map-wrap">
+      <div id="mapLoading" class="map-loading" data-t="map_loading">加载地图中...</div>
+      <svg id="mapSvg" style="display:none;" viewBox="0 0 960 500">
+        <g id="mapSphere"></g><g id="mapGraticule"></g><g id="mapCountries"></g>
+        <g id="flightArcs"></g><g id="cityDots"></g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="panel-hd"><span class="panel-title" data-t="km_by_year">每年飞行公里</span></div>
+      <div style="padding:16px 20px;" id="kmBars"><div class="empty" data-t="no_data">暂无数据</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><span class="panel-title" data-t="continents">大洲覆盖</span></div>
+      <div class="cont-wrap" id="contTags"></div>
+      <div style="padding:0 20px 16px;" id="recentPlaces"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CITIES ══ -->
+<div class="pg" id="pg-cities">
+  <div class="panel">
+    <div class="panel-hd">
+      <span class="panel-title" data-t="cities_countries">城市 & 国家</span>
+      <span class="panel-badge" id="citiesCount">0</span>
+    </div>
+    <table>
+      <thead><tr>
+        <th data-t="th_city">城市</th><th data-t="th_country">国家</th>
+        <th data-t="th_continent">大洲</th><th data-t="th_year">年份</th>
+        <th data-t="th_visits">次数</th><th data-t="th_note">备注</th><th></th>
+      </tr></thead>
+      <tbody id="citiesTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ FLIGHTS ══ -->
+<div class="pg" id="pg-flights">
+  <!-- Summary panel -->
+  <div class="panel" style="margin-bottom:20px;">
+    <div class="panel-hd">
+      <span class="panel-title" data-t="summary">统计摘要</span>
+      <select class="summ-sel" id="summaryMode" onchange="renderSummary()">
+        <option value="alliance" data-t="by_alliance">按联盟</option>
+        <option value="airline"  data-t="by_airline">按航空公司</option>
+        <option value="class"    data-t="by_class">按舱位</option>
+      </select>
+    </div>
+    <div style="padding:0 20px 16px;" id="summaryContent"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-hd">
+      <span class="panel-title" data-t="airports_flights">机场 & 航班</span>
+      <span class="panel-badge" id="flightsCount">0</span>
+    </div>
+    <table>
+      <thead><tr>
+        <th data-t="th_from">出发</th><th data-t="th_to">到达</th>
+        <th data-t="th_airline">航空公司</th><th data-t="th_alliance">联盟</th>
+        <th data-t="th_cabin">舱位</th><th data-t="th_flight">航班号</th>
+        <th data-t="th_date">日期</th><th data-t="th_km">公里</th><th></th>
+      </tr></thead>
+      <tbody id="flightsTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ ADD ══ -->
+<div class="pg" id="pg-add">
+  <div class="two-col">
+
+    <!-- City form -->
+    <div class="panel">
+      <div class="panel-hd"><span class="panel-title" data-t="add_city">添加城市</span></div>
+      <div class="form-grid">
+        <div class="fg"><label data-t="city_name">城市名</label><input id="cityName" placeholder="Paris" autocomplete="off"></div>
+        <div class="fg"><label data-t="country">国家</label><input id="cityCountry" placeholder="France" autocomplete="off"></div>
+        <div class="fg">
+          <label data-t="continent">大洲</label>
+          <select id="cityContinent">
+            <option value="">—</option>
+            <option>欧洲</option><option>亚洲</option><option>北美洲</option>
+            <option>南美洲</option><option>非洲</option><option>大洋洲</option><option>中东</option>
+          </select>
+        </div>
+        <div class="fg"><label data-t="first_year">首次到访</label><input id="cityYear" type="number" placeholder="2023" min="1990" max="2030"></div>
+        <div class="fg"><label data-t="visits">次数</label><input id="cityVisits" type="number" value="1" min="1"></div>
+        <div class="fg"><label data-t="note">备注</label><input id="cityNote" placeholder="..." autocomplete="off"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addCity()" data-t="btn_add_city">记录城市</button>
+      </div>
+    </div>
+
+    <!-- Flight form -->
+    <div class="panel">
+      <div class="panel-hd"><span class="panel-title" data-t="add_flight">添加航班</span></div>
+      <div class="form-grid">
+
+        <!-- Roundtrip toggle -->
+        <div class="fg full">
+          <label data-t="trip_type">行程类型</label>
+          <div class="rt-wrap">
+            <div class="rt-btn on" id="rtOne" onclick="setRT(false)" data-t="oneway">单程</div>
+            <div class="rt-btn" id="rtRound" onclick="setRT(true)" data-t="roundtrip">来回</div>
+          </div>
+        </div>
+
+        <!-- Airport lookup -->
+        <div class="fg">
+          <label data-t="from_iata">出发机场 IATA</label>
+          <input id="fromAirport" placeholder="YYZ" maxlength="4"
+            style="text-transform:uppercase;font-size:18px;letter-spacing:4px;text-align:center;"
+            oninput="this.value=this.value.toUpperCase()" onblur="lookupApt('from')">
+          <div id="fromInfo" class="apt-info"></div>
+        </div>
+        <div class="fg">
+          <label data-t="to_iata">到达机场 IATA</label>
+          <input id="toAirport" placeholder="CDG" maxlength="4"
+            style="text-transform:uppercase;font-size:18px;letter-spacing:4px;text-align:center;"
+            oninput="this.value=this.value.toUpperCase()" onblur="lookupApt('to')">
+          <div id="toInfo" class="apt-info"></div>
+        </div>
+
+        <!-- Auto distance -->
+        <div class="dist-row" id="distRow" style="display:none;">
+          <div>✈</div>
+          <div style="flex:1;">
+            <div class="dist-km" id="distKm">—</div>
+            <div class="dist-lbl" data-t="auto_calc">自动计算</div>
+          </div>
+          <div id="rtBadgeSm" class="rt-badge-sm" style="display:none;" data-t="roundtrip_x2">来回 ×2</div>
+        </div>
+
+        <!-- Flight number + airline detect -->
+        <div class="fg">
+          <label data-t="flight_num">航班号</label>
+          <input id="flightNum" placeholder="AC837" oninput="onFlightInput(this.value)">
+        </div>
+        <div class="fg">
+          <label data-t="date">出发日期</label>
+          <input id="flightDate" type="date">
+        </div>
+        <div class="fg" id="returnDateFg" style="display:none;">
+          <label data-t="return_date">回程日期</label>
+          <input id="returnDate" type="date">
+        </div>
+
+        <!-- Airline info row -->
+        <div class="airline-row" id="airlineRow" style="display:none;">
+          <div class="airline-em" id="airlineEm">✈</div>
+          <div>
+            <div class="airline-name" id="airlineName">—</div>
+            <div class="al" id="allianceBadge"></div>
+          </div>
+        </div>
+
+        <!-- Cabin class -->
+        <div class="fg full">
+          <label data-t="cabin_class">舱位</label>
+          <div class="cabin-grid">
+            <div class="cab-opt on" id="cab-Y" onclick="setCabin('Y')">
+              <span class="cab-em">💺</span><span data-t="economy">经济舱</span>
+            </div>
+            <div class="cab-opt" id="cab-W" onclick="setCabin('W')">
+              <span class="cab-em">🪑</span><span data-t="prem_eco">超经济舱</span>
+            </div>
+            <div class="cab-opt" id="cab-C" onclick="setCabin('C')">
+              <span class="cab-em">🛋</span><span data-t="business">商务舱</span>
+            </div>
+            <div class="cab-opt" id="cab-F" onclick="setCabin('F')">
+              <span class="cab-em">👑</span><span data-t="first">头等舱</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <!-- Unknown airport manual km -->
+      <div id="unknownCard" style="display:none;padding:0 22px 16px;">
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--orange);margin-bottom:8px;" data-t="unknown_hint">机场未找到，手动填写距离：</div>
+        <input id="manualKm" type="number" placeholder="6300" min="0" oninput="syncManualKm()" style="width:100%;">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="addFlight()" data-t="btn_add_flight">记录航班</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VIDEO ══ -->
+<div class="pg" id="pg-video">
+  <div class="panel">
+    <div class="panel-hd"><span class="panel-title" data-t="flight_anim">飞行轨迹动画</span></div>
+    <div class="vid-year-row" id="yearPills"></div>
+    <canvas id="videoCanvas" width="1200" height="600"></canvas>
+    <div class="vid-prog"><div class="vid-prog-fill" id="vidProg"></div></div>
+    <div class="vid-btn-row">
+      <button class="vbtn vbtn-play" onclick="playVid()" data-t="play">▶ 播放</button>
+      <button class="vbtn vbtn-sec" onclick="pauseVid()" data-t="pause">⏸ 暂停</button>
+      <button class="vbtn vbtn-sec" onclick="resetVid()" data-t="reset">↺ 重置</button>
+      <button class="vbtn vbtn-rec" id="recBtn" onclick="toggleRec()" data-t="rec_download">⬇ 录制下载</button>
+    </div>
+    <div class="rec-status" id="recStatus"></div>
+  </div>
+</div>
+
+<!-- ══ IMPORT ══ -->
+<div class="pg" id="pg-import">
+  <div class="two-col">
+    <div class="panel">
+      <div class="panel-hd"><span class="panel-title" data-t="import_csv">导入 CSV</span></div>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('csvInput').click()">
+        <div class="dz-icon">📂</div>
+        <div class="dz-text" data-t="drop_hint">点击或拖拽 CSV 文件</div>
+      </div>
+      <input type="file" id="csvInput" accept=".csv" style="display:none;" onchange="handleCSV(event)">
+      <div style="padding:0 20px 20px;font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);" data-t="csv_format_note">文件名含 "city" → 城市格式；含 "flight" → 航班格式</div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><span class="panel-title" data-t="formats">格式说明</span></div>
+      <div style="padding:16px 20px 0;font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);" data-t="city_fmt">城市格式</div>
+      <div class="code-block">city,country,continent,year,visits,note
+Paris,France,欧洲,2018,3,最爱的城市</div>
+      <div style="padding:0 20px;font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);" data-t="flight_fmt">航班格式</div>
+      <div class="code-block or">from,to,flight,date,km,from_lat,from_lng,to_lat,to_lng
+YYZ,CDG,AC837,2023-05-10,6300,43.6,-79.6,49.0,2.5</div>
+      <div style="padding:0 20px 20px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" onclick="exportData()" data-t="export_btn">⬇ 导出备份</button>
+        <button class="btn btn-danger" onclick="clearData()" data-t="clear_btn">🗑 清除数据</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div><!-- mainApp -->
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// TRANSLATIONS
+// ══════════════════════════════════════════════════════════════
+const T = {
+  zh:{
+    countries:'国家', cities:'城市', airports:'机场', km:'万KM',
+    nav_overview:'概览', nav_cities:'城市', nav_flights:'航班', nav_add:'添加', nav_video:'飞行视频', nav_import:'导入',
+    countries_visited:'去过的国家', cities_exp:'城市', airports_used:'机场', km_flown:'飞行公里',
+    flight_map:'飞行轨迹地图', km_by_year:'每年飞行公里', continents:'大洲覆盖',
+    summary:'统计摘要', by_alliance:'按联盟', by_airline:'按航空公司', by_class:'按舱位',
+    cities_countries:'城市 & 国家', airports_flights:'机场 & 航班',
+    th_city:'城市', th_country:'国家', th_continent:'大洲', th_year:'年份', th_visits:'次数', th_note:'备注',
+    th_from:'出发', th_to:'到达', th_airline:'航空公司', th_alliance:'联盟', th_cabin:'舱位', th_flight:'航班号', th_date:'日期', th_km:'公里',
+    add_city:'添加城市', add_flight:'添加航班',
+    city_name:'城市名', country:'国家', continent:'大洲', first_year:'首次到访', visits:'次数', note:'备注',
+    trip_type:'行程类型', oneway:'单程', roundtrip:'来回', roundtrip_x2:'来回 ×2',
+    from_iata:'出发机场 IATA', to_iata:'到达机场 IATA',
+    flight_num:'航班号', date:'出发日期', return_date:'回程日期',
+    auto_calc:'自动计算', unknown_hint:'机场未找到，手动填写距离：',
+    cabin_class:'舱位', economy:'经济舱', prem_eco:'超经济舱', business:'商务舱', first:'头等舱',
+    btn_add_city:'记录城市', btn_add_flight:'记录航班',
+    flight_anim:'飞行轨迹动画', play:'▶ 播放', pause:'⏸ 暂停', reset:'↺ 重置', rec_download:'⬇ 录制下载',
+    import_csv:'导入 CSV', drop_hint:'点击或拖拽 CSV 文件', csv_format_note:'文件名含 "city" → 城市格式；含 "flight" → 航班格式',
+    formats:'格式说明', city_fmt:'城市格式', flight_fmt:'航班格式',
+    export_btn:'⬇ 导出备份', clear_btn:'🗑 清除数据',
+    map_loading:'加载地图中...',
+    no_data:'暂无数据',
+    fill_city:'请填写城市和国家', fill_airport:'请填写出发和到达机场',
+    saved_city:'✓ 已记录', saved_flight:'✓ 已记录航班', deleted:'已删除',
+    imported:'条记录已导入', exported:'备份已下载', cleared:'数据已清除',
+    confirm_delete:'删除这条记录？', confirm_clear:'确定清除所有数据？不可撤销。',
+    no_alliance:'无联盟', no_alliance_en:'No Alliance',
+    earth_laps:'绕地球',laps:'圈',
+    continents_zh:['欧洲','亚洲','北美洲','南美洲','非洲','大洋洲','中东'],
+    continents_en:['Europe','Asia','N. America','S. America','Africa','Oceania','Middle East'],
+    select_account:'选择账户',
+    rec_hint:'录制中... 播放完毕自动停止', rec_unsupported:'浏览器不支持，请用 Chrome', rec_done:'✓ 视频已下载',
+  },
+  en:{
+    countries:'Countries', cities:'Cities', airports:'Airports', km:'10K KM',
+    nav_overview:'Overview', nav_cities:'Cities', nav_flights:'Flights', nav_add:'Add', nav_video:'Video', nav_import:'Import',
+    countries_visited:'Countries Visited', cities_exp:'Cities', airports_used:'Airports', km_flown:'KM Flown',
+    flight_map:'Flight Route Map', km_by_year:'KM by Year', continents:'Continents',
+    summary:'Summary', by_alliance:'By Alliance', by_airline:'By Airline', by_class:'By Class',
+    cities_countries:'Cities & Countries', airports_flights:'Airports & Flights',
+    th_city:'City', th_country:'Country', th_continent:'Continent', th_year:'Year', th_visits:'Visits', th_note:'Note',
+    th_from:'From', th_to:'To', th_airline:'Airline', th_alliance:'Alliance', th_cabin:'Cabin', th_flight:'Flight', th_date:'Date', th_km:'KM',
+    add_city:'Add City', add_flight:'Add Flight',
+    city_name:'City', country:'Country', continent:'Continent', first_year:'First Visit', visits:'Visits', note:'Note',
+    trip_type:'Trip Type', oneway:'One Way', roundtrip:'Round Trip', roundtrip_x2:'Round Trip ×2',
+    from_iata:'From (IATA)', to_iata:'To (IATA)',
+    flight_num:'Flight No.', date:'Departure Date', return_date:'Return Date',
+    auto_calc:'Auto-calculated', unknown_hint:'Airport not found — enter distance manually:',
+    cabin_class:'Cabin Class', economy:'Economy', prem_eco:'Premium Economy', business:'Business', first:'First Class',
+    btn_add_city:'Save City', btn_add_flight:'Save Flight',
+    flight_anim:'Flight Route Animation', play:'▶ Play', pause:'⏸ Pause', reset:'↺ Reset', rec_download:'⬇ Record & Download',
+    import_csv:'Import CSV', drop_hint:'Click or drag CSV file', csv_format_note:'"city" in filename → city format; "flight" → flight format',
+    formats:'Format Guide', city_fmt:'City CSV Format', flight_fmt:'Flight CSV Format',
+    export_btn:'⬇ Export Backup', clear_btn:'🗑 Clear Data',
+    map_loading:'Loading map...',
+    no_data:'No data yet',
+    fill_city:'Please enter city and country', fill_airport:'Please enter departure and arrival airports',
+    saved_city:'✓ Saved', saved_flight:'✓ Flight saved', deleted:'Deleted',
+    imported:'records imported', exported:'Backup downloaded', cleared:'Data cleared',
+    confirm_delete:'Delete this record?', confirm_clear:'Clear all data? Cannot be undone.',
+    no_alliance:'No Alliance', no_alliance_en:'No Alliance',
+    earth_laps:'Earth loops:',laps:'',
+    continents_zh:['欧洲','亚洲','北美洲','南美洲','非洲','大洋洲','中东'],
+    continents_en:['Europe','Asia','N. America','S. America','Africa','Oceania','Middle East'],
+    select_account:'Select Account',
+    rec_hint:'Recording... auto-stops when done', rec_unsupported:'Not supported, use Chrome', rec_done:'✓ Video downloaded',
+  }
+};
+let lang = localStorage.getItem('fl_lang') || 'zh';
+const t = k => T[lang][k] || T.zh[k] || k;
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('fl_lang', l);
+  document.getElementById('lzh').classList.toggle('on', l==='zh');
+  document.getElementById('len').classList.toggle('on', l==='en');
+  document.querySelectorAll('[data-t]').forEach(el => {
+    const k = el.getAttribute('data-t');
+    const v = t(k);
+    if (el.tagName === 'OPTION') return;
+    if (el.tagName === 'INPUT' && el.placeholder) return;
+    el.textContent = v;
+  });
+  updateAll();
+  renderSummary();
+}
+
+// ══════════════════════════════════════════════════════════════
+// ACCOUNTS
+// ══════════════════════════════════════════════════════════════
+const ACCOUNTS = {
+  BBTG: { color:'var(--accent)', bg:'rgba(0,200,255,.15)', initials:'BG' },
+  JJ:   { color:'var(--orange)', bg:'rgba(255,107,53,.15)', initials:'JJ' },
+};
+let currentAccount = null;
+
+function getKey(account, type) { return `fl_${account}_${type}`; }
+
+function selectAccount(name) {
+  currentAccount = name;
+  localStorage.setItem('fl_last_account', name);
+  const ac = ACCOUNTS[name];
+  document.getElementById('hAv').style.background = ac.bg;
+  document.getElementById('hAv').style.color = ac.color;
+  document.getElementById('hAv').textContent = ac.initials;
+  document.getElementById('hAname').textContent = name;
+  document.getElementById('accountScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  loadAccountData();
+  updateAll();
+  setTimeout(() => { if (!mapReady) initMap(); }, 300);
+}
+
+function switchAccount() {
+  // Update flight counts on account screen
+  updateAccountCounts();
+  document.getElementById('accountScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  currentAccount = null;
+}
+
+function updateAccountCounts() {
+  ['BBTG','JJ'].forEach(name => {
+    const fl = JSON.parse(localStorage.getItem(getKey(name,'flights')) || '[]');
+    const ci = JSON.parse(localStorage.getItem(getKey(name,'cities')) || '[]');
+    const el = document.getElementById('acCount-'+name);
+    if (el) el.textContent = `${fl.length} flights · ${ci.length} cities`;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════════════════
+let cities = [];
+let flights = [];
+
+function loadAccountData() {
+  cities = JSON.parse(localStorage.getItem(getKey(currentAccount,'cities')) || '[]');
+  flights = JSON.parse(localStorage.getItem(getKey(currentAccount,'flights')) || '[]');
+}
+
+function save() {
+  localStorage.setItem(getKey(currentAccount,'cities'), JSON.stringify(cities));
+  localStorage.setItem(getKey(currentAccount,'flights'), JSON.stringify(flights));
+  updateAll();
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// ══════════════════════════════════════════════════════════════
+// NAV
+// ══════════════════════════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  document.getElementById('pg-'+name).classList.add('on');
+  const tabs = ['overview','cities','flights','add','video','import'];
+  document.querySelectorAll('.tab')[tabs.indexOf(name)]?.classList.add('on');
+  if (name === 'video') { updateYearPills(); drawVidFrame(0); }
+  if (name === 'flights') renderSummary();
+  if (name === 'overview') drawMap();
+}
+
+// ══════════════════════════════════════════════════════════════
+// AIRPORT DATABASE
+// ══════════════════════════════════════════════════════════════
+const APTS = {
+  YYZ:['Toronto Pearson','Toronto',43.677,-79.631],YVR:['Vancouver Intl','Vancouver',49.194,-123.184],
+  YUL:['Montreal Trudeau','Montreal',45.470,-73.740],YYC:['Calgary Intl','Calgary',51.131,-114.010],
+  JFK:['JFK Intl','New York',40.640,-73.779],LGA:['LaGuardia','New York',40.777,-73.873],
+  EWR:['Newark Liberty','Newark',40.690,-74.174],LAX:['Los Angeles Intl','Los Angeles',33.943,-118.408],
+  ORD:["O'Hare Intl",'Chicago',41.978,-87.905],SFO:['San Francisco Intl','San Francisco',37.619,-122.375],
+  MIA:['Miami Intl','Miami',25.796,-80.287],DFW:['Dallas/Fort Worth','Dallas',32.897,-97.038],
+  ATL:['Hartsfield-Jackson','Atlanta',33.641,-84.427],SEA:['Seattle-Tacoma','Seattle',47.449,-122.309],
+  BOS:['Logan Intl','Boston',42.365,-71.010],DEN:['Denver Intl','Denver',39.856,-104.674],
+  LAS:['Harry Reid Intl','Las Vegas',36.080,-115.152],PHX:['Sky Harbor','Phoenix',33.437,-112.008],
+  LHR:['Heathrow','London',51.477,-0.461],LGW:['Gatwick','London',51.148,-0.190],
+  CDG:['Charles de Gaulle','Paris',49.013,2.550],ORY:['Orly','Paris',48.725,2.360],
+  AMS:['Schiphol','Amsterdam',52.309,4.764],FRA:['Frankfurt Intl','Frankfurt',50.033,8.571],
+  MUC:['Munich Intl','Munich',48.354,11.786],MAD:['Adolfo Suárez','Madrid',40.472,-3.561],
+  BCN:['Barcelona El Prat','Barcelona',41.297,2.083],FCO:['Fiumicino','Rome',41.799,12.248],
+  MXP:['Malpensa','Milan',45.630,8.728],ZUR:['Zurich','Zurich',47.464,8.549],
+  VIE:['Vienna Intl','Vienna',48.110,16.570],BRU:['Brussels','Brussels',50.901,4.484],
+  CPH:['Copenhagen','Copenhagen',55.618,12.656],ARN:['Stockholm Arlanda','Stockholm',59.652,17.919],
+  OSL:['Oslo Gardermoen','Oslo',60.194,11.100],HEL:['Helsinki Vantaa','Helsinki',60.317,24.963],
+  LIS:['Lisbon','Lisbon',38.774,-9.134],ATH:['Athens Intl','Athens',37.936,23.944],
+  IST:['Istanbul Intl','Istanbul',41.275,28.752],WAW:['Warsaw Chopin','Warsaw',52.166,20.967],
+  PRG:['Prague Václav Havel','Prague',50.101,14.260],BUD:['Budapest','Budapest',47.437,19.261],
+  DUB:['Dublin','Dublin',53.421,-6.270],MAN:['Manchester','Manchester',53.354,-2.275],
+  GVA:['Geneva','Geneva',46.238,6.109],NCE:["Nice Côte d'Azur",'Nice',43.658,7.215],
+  DXB:['Dubai Intl','Dubai',25.253,55.365],AUH:['Abu Dhabi','Abu Dhabi',24.433,54.651],
+  DOH:['Hamad Intl','Doha',25.273,51.608],RUH:['King Khalid','Riyadh',24.958,46.699],
+  TLV:['Ben Gurion','Tel Aviv',32.011,34.887],AMM:['Queen Alia','Amman',31.723,35.993],
+  NRT:['Narita','Tokyo',35.765,140.386],HND:['Haneda','Tokyo',35.553,139.781],
+  KIX:['Kansai Intl','Osaka',34.427,135.244],ICN:['Incheon','Seoul',37.469,126.451],
+  PEK:['Capital Intl','Beijing',40.080,116.585],PVG:['Pudong','Shanghai',31.144,121.805],
+  HKG:['Hong Kong Intl','Hong Kong',22.308,113.915],TPE:['Taoyuan','Taipei',25.078,121.233],
+  BKK:['Suvarnabhumi','Bangkok',13.681,100.747],SIN:['Changi','Singapore',1.364,103.991],
+  KUL:['KL Intl','Kuala Lumpur',2.746,101.710],CGK:['Soekarno-Hatta','Jakarta',-6.127,106.656],
+  DPS:['Ngurah Rai','Bali',-8.748,115.167],MNL:['Ninoy Aquino','Manila',14.509,121.020],
+  DEL:['Indira Gandhi','Delhi',28.556,77.100],BOM:['Mumbai Intl','Mumbai',19.089,72.868],
+  JNB:['OR Tambo','Johannesburg',-26.134,28.242],CPT:['Cape Town Intl','Cape Town',-33.965,18.602],
+  NBO:['Jomo Kenyatta','Nairobi',-1.319,36.926],CAI:['Cairo Intl','Cairo',30.122,31.406],
+  CMN:['Mohammed V','Casablanca',33.368,-7.590],
+  SYD:['Kingsford Smith','Sydney',-33.946,151.177],MEL:['Melbourne Intl','Melbourne',-37.669,144.843],
+  BNE:['Brisbane Intl','Brisbane',-27.384,153.117],AKL:['Auckland Intl','Auckland',-37.008,174.792],
+  GRU:['Guarulhos','São Paulo',-23.432,-46.473],GIG:['Galeão','Rio de Janeiro',-22.810,-43.251],
+  EZE:['Ministro Pistarini','Buenos Aires',-34.822,-58.536],SCL:['Arturo Merino','Santiago',-33.393,-70.786],
+  BOG:["El Dorado",'Bogotá',4.702,-74.147],LIM:['Jorge Chávez','Lima',-12.022,-77.114],
+  MEX:['Mexico City Intl','Mexico City',19.436,-99.072],YHZ:['Halifax Stanfield','Halifax',44.880,-63.509],
+  YEG:['Edmonton Intl','Edmonton',53.310,-113.580],YOW:['Ottawa Macdonald','Ottawa',45.322,-75.669],
+  WYS:['Yellowstone','West Yellowstone',44.688,-111.118],
+};
+
+const AIRLINES = {
+  AC:['Air Canada','🍁','star'],UA:['United Airlines','🔵','star'],LH:['Lufthansa','✈','star'],
+  LX:['Swiss','🇨🇭','star'],OS:['Austrian','🇦🇹','star'],TG:['Thai Airways','🇹🇭','star'],
+  SQ:['Singapore Airlines','🦁','star'],NZ:['Air New Zealand','🥝','star'],NH:['ANA','🇯🇵','star'],
+  OZ:['Asiana','🇰🇷','star'],CA:['Air China','🇨🇳','star'],ET:['Ethiopian','🇪🇹','star'],
+  TP:['TAP Portugal','🇵🇹','star'],TK:['Turkish Airlines','🇹🇷','star'],MS:['EgyptAir','🇪🇬','star'],
+  AI:['Air India','🇮🇳','star'],AV:['Avianca','🇨🇴','star'],CM:['Copa Airlines','🇵🇦','star'],
+  SK:['SAS','🇸🇪','star'],LO:['LOT Polish','🇵🇱','star'],
+  AA:['American Airlines','🇺🇸','oneworld'],BA:['British Airways','🇬🇧','oneworld'],
+  QF:['Qantas','🦘','oneworld'],CX:['Cathay Pacific','🇭🇰','oneworld'],
+  JL:['Japan Airlines','🎌','oneworld'],IB:['Iberia','🇪🇸','oneworld'],
+  MH:['Malaysia Airlines','🇲🇾','oneworld'],QR:['Qatar Airways','🇶🇦','oneworld'],
+  AY:['Finnair','🇫🇮','oneworld'],AS:['Alaska Airlines','🛬','oneworld'],
+  LA:['LATAM','🌎','oneworld'],AT:['Royal Air Maroc','🇲🇦','oneworld'],
+  AF:['Air France','🇫🇷','skyteam'],KL:['KLM','🌷','skyteam'],
+  DL:['Delta Air Lines','🔺','skyteam'],KE:['Korean Air','🇰🇷','skyteam'],
+  MU:['China Eastern','🇨🇳','skyteam'],CZ:['China Southern','🇨🇳','skyteam'],
+  SV:['Saudia','🇸🇦','skyteam'],AM:['Aeroméxico','🇲🇽','skyteam'],
+  VN:['Vietnam Airlines','🇻🇳','skyteam'],GA:['Garuda Indonesia','🇮🇩','skyteam'],
+  AR:['Aerolíneas Argentinas','🇦🇷','skyteam'],
+  EK:['Emirates','🇦🇪',null],EY:['Etihad','🇦🇪',null],FZ:['flydubai','🇦🇪',null],
+  WN:['Southwest','🌞',null],B6:['JetBlue','💙',null],WS:['WestJet','🇨🇦',null],
+  FR:['Ryanair','💛',null],U2:['easyJet','🟠',null],W6:['Wizz Air','💜',null],
+  PC:['Pegasus','🐎',null],AK:['AirAsia','🔴',null],FD:['Thai AirAsia','🇹🇭',null],
+  JQ:['Jetstar','⭐',null],TR:['Scoot','🇸🇬',null],
+  CI:['China Airlines','🇹🇼',null],BR:['EVA Air','🇹🇼',null],
+  HU:['Hainan Airlines','🇨🇳',null],HX:['Hong Kong Airlines','🇭🇰',null],
+  '6E':['IndiGo','💙',null],HA:['Hawaiian Airlines','🌺',null],G3:['Gol','🇧🇷',null],
+  WY:['Oman Air','🇴🇲',null],GF:['Gulf Air','🇧🇭',null],MK:['Air Mauritius','🇲🇺',null],
+};
+
+const ALLIANCE_NAMES = {
+  star:     {zh:'星空联盟',en:'Star Alliance'},
+  oneworld: {zh:'寰宇一家',en:'oneworld'},
+  skyteam:  {zh:'天合联盟',en:'SkyTeam'},
+};
+
+const CABIN_META = {
+  Y:{zh:'经济舱',  en:'Economy',         emoji:'💺',color:'var(--muted)'},
+  W:{zh:'超经济舱',en:'Premium Economy',  emoji:'🪑',color:'var(--accent)'},
+  C:{zh:'商务舱',  en:'Business',         emoji:'🛋',color:'var(--gold)'},
+  F:{zh:'头等舱',  en:'First Class',      emoji:'👑',color:'var(--orange)'},
+};
+
+// ══════════════════════════════════════════════════════════════
+// AIRPORT LOOKUP + DISTANCE
+// ══════════════════════════════════════════════════════════════
+let aptLookup = {from:null,to:null,km:null};
+
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
+}
+
+function lookupApt(side) {
+  const code = document.getElementById(side==='from'?'fromAirport':'toAirport').value.trim().toUpperCase();
+  const infoEl = document.getElementById(side==='from'?'fromInfo':'toInfo');
+  if (code.length < 3) { infoEl.textContent=''; aptLookup[side]=null; return; }
+  const apt = APTS[code];
+  if (apt) {
+    infoEl.textContent = `✓ ${apt[1]} · ${apt[0]}`;
+    infoEl.className = 'apt-info ok';
+    aptLookup[side] = {code,city:apt[1],name:apt[0],lat:apt[2],lng:apt[3]};
+    document.getElementById('unknownCard').style.display = 'none';
+  } else {
+    infoEl.textContent = lang==='zh'?'未找到':'Not found';
+    infoEl.className = 'apt-info err';
+    aptLookup[side] = null;
+    document.getElementById('unknownCard').style.display = 'block';
+  }
+  updateDistRow();
+}
+
+function updateDistRow() {
+  const f=aptLookup.from, t2=aptLookup.to;
+  const row=document.getElementById('distRow');
+  if (f && t2) {
+    const km=haversine(f.lat,f.lng,t2.lat,t2.lng);
+    aptLookup.km=km;
+    const d=isRT?km*2:km;
+    document.getElementById('distKm').textContent=d.toLocaleString()+' km';
+    document.getElementById('rtBadgeSm').style.display=isRT?'inline':'none';
+    row.style.display='flex';
+  } else { row.style.display='none'; }
+}
+
+function syncManualKm(){aptLookup.km=parseFloat(document.getElementById('manualKm').value)||null;}
+
+// Airline detect
+function parseAirlineCode(fn){
+  const m=(fn||'').trim().toUpperCase().match(/^([A-Z]{2}|[A-Z]\d)\d/);
+  return m?m[1]:null;
+}
+function onFlightInput(val){
+  const code=parseAirlineCode(val);
+  const row=document.getElementById('airlineRow');
+  if(!code||!AIRLINES[code]){row.style.display='none';return;}
+  const [name,emoji,alliance]=AIRLINES[code];
+  document.getElementById('airlineEm').textContent=emoji;
+  document.getElementById('airlineName').textContent=name;
+  const ab=document.getElementById('allianceBadge');
+  if(alliance){
+    ab.textContent=ALLIANCE_NAMES[alliance][lang];
+    ab.className='al al-'+alliance.replace('oneworld','one');
+  } else {
+    ab.textContent=t('no_alliance');
+    ab.className='al al-none';
+  }
+  row.style.display='flex';
+}
+
+// ══════════════════════════════════════════════════════════════
+// FORM STATE
+// ══════════════════════════════════════════════════════════════
+let isRT=false;
+let currentCabin='Y';
+
+function setRT(val){
+  isRT=val;
+  document.getElementById('rtOne').classList.toggle('on',!val);
+  document.getElementById('rtRound').classList.toggle('on',val);
+  document.getElementById('returnDateFg').style.display=val?'block':'none';
+  document.getElementById('rtBadgeSm').style.display=val&&aptLookup.from&&aptLookup.to?'inline':'none';
+  updateDistRow();
+}
+
+function setCabin(code){
+  currentCabin=code;
+  ['Y','W','C','F'].forEach(c=>document.getElementById('cab-'+c)?.classList.toggle('on',c===code));
+}
+
+// ══════════════════════════════════════════════════════════════
+// ADD DATA
+// ══════════════════════════════════════════════════════════════
+function addCity(){
+  const name=document.getElementById('cityName').value.trim();
+  const country=document.getElementById('cityCountry').value.trim();
+  if(!name||!country){toast(t('fill_city'));return;}
+  cities.push({city:name,country,continent:document.getElementById('cityContinent').value,
+    year:parseInt(document.getElementById('cityYear').value)||new Date().getFullYear(),
+    visits:parseInt(document.getElementById('cityVisits').value)||1,
+    note:document.getElementById('cityNote').value.trim(),id:Date.now()});
+  ['cityName','cityCountry','cityNote'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cityVisits').value='1';
+  save();toast(t('saved_city')+' '+name);
+}
+
+function addFlight(){
+  const from=document.getElementById('fromAirport').value.trim().toUpperCase();
+  const to=document.getElementById('toAirport').value.trim().toUpperCase();
+  if(!from||!to){toast(t('fill_airport'));return;}
+  if(!aptLookup.from)lookupApt('from');
+  if(!aptLookup.to)lookupApt('to');
+  const fd=aptLookup.from,td=aptLookup.to;
+  const oneWayKm=aptLookup.km||parseFloat(document.getElementById('manualKm')?.value)||0;
+  const dateVal=document.getElementById('flightDate').value;
+  const fnVal=document.getElementById('flightNum').value.trim();
+  const aCode=parseAirlineCode(fnVal);
+  const aData=aCode?AIRLINES[aCode]:null;
+  const base={fromCity:fd?.city||'',toCity:td?.city||'',flight:fnVal,
+    airline:aData?aData[0]:'',alliance:aData?aData[2]:null,cabin:currentCabin,
+    fromLat:fd?.lat||null,fromLng:fd?.lng||null,toLat:td?.lat||null,toLng:td?.lng||null};
+  flights.push({...base,from,to,date:dateVal,km:oneWayKm,
+    year:new Date(dateVal||Date.now()).getFullYear(),id:Date.now()});
+  if(isRT){
+    const rd=document.getElementById('returnDate').value||dateVal;
+    flights.push({...base,from:to,to:from,fromCity:td?.city||'',toCity:fd?.city||'',
+      fromLat:td?.lat||null,fromLng:td?.lng||null,toLat:fd?.lat||null,toLng:fd?.lng||null,
+      date:rd,km:oneWayKm,year:new Date(rd||Date.now()).getFullYear(),id:Date.now()+1});
+  }
+  ['fromAirport','toAirport','flightNum','flightDate','returnDate','manualKm'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['fromInfo','toInfo'].forEach(id=>{const e=document.getElementById(id);if(e){e.textContent='';e.className='apt-info';}});
+  document.getElementById('distRow').style.display='none';
+  document.getElementById('airlineRow').style.display='none';
+  document.getElementById('unknownCard').style.display='none';
+  aptLookup={from:null,to:null,km:null};
+  setCabin('Y');
+  const msg=isRT?`✓ ${from} ⇄ ${to} (×2)`:t('saved_flight')+': '+from+' → '+to;
+  save();toast(msg);
+}
+
+// ══════════════════════════════════════════════════════════════
+// CSV
+// ══════════════════════════════════════════════════════════════
+const dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.style.borderColor='var(--accent)';});
+dz.addEventListener('dragleave',()=>{dz.style.borderColor='';});
+dz.addEventListener('drop',e=>{e.preventDefault();dz.style.borderColor='';handleCSVFile(e.dataTransfer.files[0]);});
+function handleCSV(e){handleCSVFile(e.target.files[0]);}
+function handleCSVFile(file){
+  if(!file)return;
+  const isFlight=file.name.toLowerCase().includes('flight');
+  Papa.parse(file,{header:true,skipEmptyLines:true,complete:res=>{
+    let count=0;
+    res.data.forEach(row=>{
+      if(isFlight){
+        if(!row.from||!row.to)return;
+        const fd2=APTS[(row.from||'').toUpperCase()],td2=APTS[(row.to||'').toUpperCase()];
+        const km=parseFloat(row.km)||0;
+        flights.push({from:(row.from||'').toUpperCase(),to:(row.to||'').toUpperCase(),
+          fromCity:fd2?fd2[1]:'',toCity:td2?td2[1]:'',
+          flight:row.flight||'',airline:'',alliance:null,cabin:row.cabin||'Y',
+          date:row.date||'',km,
+          fromLat:parseFloat(row.from_lat)||fd2?.[2]||null,fromLng:parseFloat(row.from_lng)||fd2?.[3]||null,
+          toLat:parseFloat(row.to_lat)||td2?.[2]||null,toLng:parseFloat(row.to_lng)||td2?.[3]||null,
+          year:new Date(row.date||Date.now()).getFullYear(),id:Date.now()+Math.random()});
+      } else {
+        if(!row.city||!row.country)return;
+        cities.push({city:row.city,country:row.country,continent:row.continent||'',
+          year:parseInt(row.year)||new Date().getFullYear(),
+          visits:parseInt(row.visits)||1,note:row.note||'',id:Date.now()+Math.random()});
+      }
+      count++;
+    });
+    save();toast(`✓ ${count} ${t('imported')}`);
+  }});
+}
+
+function deleteCity(id){if(confirm(t('confirm_delete'))){cities=cities.filter(c=>c.id!==id);save();toast(t('deleted'));}}
+function deleteFlight(id){if(confirm(t('confirm_delete'))){flights=flights.filter(f=>f.id!==id);save();toast(t('deleted'));}}
+
+function exportData(){
+  const b=new Blob([JSON.stringify({cities,flights,account:currentAccount,exported:new Date().toISOString()},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`flightlog-${currentAccount}-backup.json`;a.click();
+  toast(t('exported'));
+}
+function clearData(){if(confirm(t('confirm_clear'))){cities=[];flights=[];save();toast(t('cleared'));}}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════
+function updateAll(){
+  if(!currentAccount)return;
+  const countries=new Set(cities.map(c=>c.country));
+  const airports=new Set([...flights.map(f=>f.from),...flights.map(f=>f.to)].filter(Boolean));
+  const totalKm=Math.round(flights.reduce((s,f)=>s+(f.km||0),0));
+  const rounds=(totalKm/40075).toFixed(1);
+
+  // Header stats
+  document.getElementById('hC').textContent=countries.size;
+  document.getElementById('hCi').textContent=cities.length;
+  document.getElementById('hA').textContent=airports.size;
+  document.getElementById('hKm').textContent=totalKm>=10000?(totalKm/10000).toFixed(1):(totalKm/1000).toFixed(1);
+
+  // Stat cards
+  document.getElementById('sC').textContent=countries.size;
+  document.getElementById('sCSub').textContent=countries.size>0?[...countries].slice(0,3).join(' · '):'—';
+  document.getElementById('sCi').textContent=cities.length;
+  document.getElementById('sCiSub').textContent=cities.length>0?`最近: ${cities[cities.length-1].city}`:'—';
+  document.getElementById('sA').textContent=airports.size;
+  document.getElementById('sASub').textContent=airports.size>0?[...airports].slice(0,3).join(' · '):'—';
+  document.getElementById('sKm').textContent=totalKm>=1000?(totalKm/1000).toFixed(1)+'K':totalKm;
+  document.getElementById('sKmSub').textContent=`${t('earth_laps')} ${rounds} ${t('laps')}`;
+
+  // KM by year
+  const kmY={};
+  flights.forEach(f=>{kmY[f.year]=(kmY[f.year]||0)+(f.km||0);});
+  const yrs=Object.keys(kmY).sort();
+  const maxK=Math.max(...Object.values(kmY),1);
+  document.getElementById('kmBars').innerHTML=yrs.length===0
+    ?`<div class="empty" data-t="no_data">${t('no_data')}</div>`
+    :yrs.map(y=>`<div class="ybar-row"><div class="ybar-yr">${y}</div><div class="ybar-track"><div class="ybar-fill" style="width:${(kmY[y]/maxK*100).toFixed(1)}%"></div></div><div class="ybar-val">${Math.round(kmY[y]/1000)}K</div></div>`).join('');
+
+  // Continents
+  const zhConts=T.zh.continents_zh;
+  const dispConts=T[lang].continents_en;
+  const visitedConts=new Set(cities.map(c=>c.continent));
+  document.getElementById('contTags').innerHTML=zhConts.map((c,i)=>
+    `<div class="ctag ${visitedConts.has(c)?'v':''}">${dispConts[i]}</div>`).join('');
+
+  // Recent places
+  const recent=[...cities].sort((a,b)=>b.year-a.year).slice(0,5);
+  document.getElementById('recentPlaces').innerHTML=recent.map(c=>
+    `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(26,53,88,.4);font-size:13px;"><span>${c.city}</span><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${c.country} · ${c.year}</span></div>`).join('');
+
+  // Cities table
+  document.getElementById('citiesCount').textContent=cities.length;
+  document.getElementById('citiesTable').innerHTML=cities.length===0
+    ?`<tr><td colspan="7" class="empty">${t('no_data')}</td></tr>`
+    :[...cities].reverse().map(c=>`<tr>
+      <td><strong>${c.city}</strong></td>
+      <td>${c.country}</td>
+      <td><span class="badge b-blue">${c.continent||'—'}</span></td>
+      <td style="font-family:var(--mono);font-size:12px;">${c.year}</td>
+      <td style="font-family:var(--mono);font-size:12px;">${c.visits}×</td>
+      <td style="color:var(--muted);font-size:12px;">${c.note||'—'}</td>
+      <td><button class="del-btn" onclick="deleteCity(${c.id})">×</button></td>
+    </tr>`).join('');
+
+  // Flights table
+  document.getElementById('flightsCount').textContent=flights.length;
+  document.getElementById('flightsTable').innerHTML=flights.length===0
+    ?`<tr><td colspan="9" class="empty">${t('no_data')}</td></tr>`
+    :[...flights].reverse().map(f=>{
+      const cab=CABIN_META[f.cabin||'Y']||CABIN_META.Y;
+      const alName=f.alliance?ALLIANCE_NAMES[f.alliance]?.[lang]:null;
+      const alCls=f.alliance?'al al-'+f.alliance.replace('oneworld','one'):'al al-none';
+      const cabLabel=cab[lang==='zh'?'zh':'en'];
+      return `<tr>
+        <td><span class="badge b-orange">${f.from}</span>${f.fromCity?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">${f.fromCity}</div>`:''}</td>
+        <td><span class="badge b-blue">${f.to}</span>${f.toCity?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">${f.toCity}</div>`:''}</td>
+        <td style="font-size:12px;">${f.airline||'—'}</td>
+        <td>${alName?`<span class="${alCls}">${alName}</span>`:`<span class="${alCls}">${t('no_alliance')}</span>`}</td>
+        <td><span style="font-size:16px;">${cab.emoji}</span> <span style="font-size:11px;font-family:var(--mono);color:${cab.color};">${cabLabel}</span></td>
+        <td style="font-family:var(--mono);font-size:12px;">${f.flight||'—'}</td>
+        <td style="font-family:var(--mono);font-size:12px;">${f.date||'—'}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--orange);">${f.km?f.km.toLocaleString()+' km':'—'}</td>
+        <td><button class="del-btn" onclick="deleteFlight(${f.id})">×</button></td>
+      </tr>`;
+    }).join('');
+
+  drawMap();
+  updateYearPills();
+  renderSummary();
+  updateAccountCounts();
+}
+
+// ══════════════════════════════════════════════════════════════
+// SUMMARY
+// ══════════════════════════════════════════════════════════════
+function renderSummary(){
+  const mode=document.getElementById('summaryMode')?.value||'alliance';
+  const el=document.getElementById('summaryContent');
+  if(!el)return;
+  if(flights.length===0){el.innerHTML=`<div class="empty">${t('no_data')}</div>`;return;}
+  const groups={};
+  flights.forEach(f=>{
+    let key,label,emoji,color;
+    if(mode==='alliance'){
+      key=f.alliance||'none';
+      label=f.alliance?ALLIANCE_NAMES[f.alliance]?.[lang]:t('no_alliance');
+      emoji=key==='star'?'⭐':key==='oneworld'?'🌐':key==='skyteam'?'🌍':'✈️';
+      color=key==='star'?'var(--accent)':key==='oneworld'?'var(--orange)':key==='skyteam'?'var(--gold)':'var(--muted)';
+    } else if(mode==='airline'){
+      key=f.airline||'Unknown';label=key;
+      emoji='✈️';color='var(--accent)';
+    } else {
+      key=f.cabin||'Y';
+      const cm=CABIN_META[key]||CABIN_META.Y;
+      label=cm[lang==='zh'?'zh':'en'];emoji=cm.emoji;color=cm.color;
+    }
+    if(!groups[key])groups[key]={label,emoji,color,km:0,count:0};
+    groups[key].km+=(f.km||0);groups[key].count++;
+  });
+  const sorted=Object.values(groups).sort((a,b)=>b.km-a.km);
+  const maxKm=sorted[0]?.km||1;
+  const flLabel=lang==='zh'?'次':'flights';
+  const kmShort=km=>km>=1000?(km/1000).toFixed(1)+'K km':km+' km';
+  el.innerHTML=sorted.map(g=>`
+    <div class="summ-row">
+      <div class="summ-em">${g.emoji}</div>
+      <div class="summ-body">
+        <div class="summ-name" style="color:${g.color};">${g.label}</div>
+        <div class="summ-track"><div class="summ-fill" style="width:${(g.km/maxKm*100).toFixed(1)}%;background:${g.color};opacity:.7;"></div></div>
+      </div>
+      <div class="summ-right">
+        <div class="summ-km">${kmShort(Math.round(g.km))}</div>
+        <div class="summ-ct">${g.count} ${flLabel}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// MAP — D3 + TopoJSON
+// ══════════════════════════════════════════════════════════════
+let mapReady=false,worldData=null,mapProj=null,mapPathFn=null;
+
+function countryMatch(feature,userCountries){
+  const props=feature.properties||{};
+  const name=(props.NAME||props.name||props.ADMIN||'').toLowerCase();
+  for(const uc of userCountries){
+    const u=uc.toLowerCase();
+    if(name===u||name.includes(u)||u.includes(name))return true;
+  }
+  return false;
+}
+
+async function initMap(){
+  if(worldData){drawMap();return;}
+  try{
+    const res=await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+    worldData=await res.json();
+    mapReady=true;
+    document.getElementById('mapLoading').style.display='none';
+    document.getElementById('mapSvg').style.display='block';
+    drawMap();
+  }catch(e){
+    const el=document.getElementById('mapLoading');
+    if(el)el.textContent=lang==='zh'?'地图加载失败，请检查网络':'Map load failed';
+  }
+}
+
+function drawMap(){
+  if(!worldData){initMap();return;}
+  const svg=document.getElementById('mapSvg');
+  const W=960,H=500;
+  mapProj=d3.geoNaturalEarth1().scale(153).translate([W/2,H/2]);
+  mapPathFn=d3.geoPath().projection(mapProj);
+  const userCountries=new Set(cities.map(c=>c.country));
+  const features=topojson.feature(worldData,worldData.objects.countries).features;
+  const ns='http://www.w3.org/2000/svg';
+
+  // Sphere
+  const sphereEl=document.getElementById('mapSphere');sphereEl.innerHTML='';
+  const sp=document.createElementNS(ns,'path');sp.setAttribute('class','sphere');
+  sp.setAttribute('d',mapPathFn({type:'Sphere'})||'');sphereEl.appendChild(sp);
+
+  // Graticule
+  const gratEl=document.getElementById('mapGraticule');gratEl.innerHTML='';
+  const gp=document.createElementNS(ns,'path');gp.setAttribute('class','graticule');
+  gp.setAttribute('d',mapPathFn(d3.geoGraticule()())||'');gratEl.appendChild(gp);
+
+  // Countries
+  const cEl=document.getElementById('mapCountries');cEl.innerHTML='';
+  features.forEach(feat=>{
+    const d=mapPathFn(feat);if(!d)return;
+    const p=document.createElementNS(ns,'path');
+    p.setAttribute('d',d);
+    p.setAttribute('class','country'+(countryMatch(feat,userCountries)?' visited':''));
+    cEl.appendChild(p);
+  });
+
+  // Arcs (great circle)
+  const arcEl=document.getElementById('flightArcs');arcEl.innerHTML='';
+  const arcPath=d3.geoPath().projection(mapProj);
+  flights.forEach(f=>{
+    if(f.fromLat==null||f.toLat==null)return;
+    const line={type:'LineString',coordinates:[[f.fromLng,f.fromLat],[f.toLng,f.toLat]]};
+    const pe=document.createElementNS(ns,'path');
+    pe.setAttribute('d',arcPath(line)||'');pe.setAttribute('class','flight-arc');
+    arcEl.appendChild(pe);
+  });
+
+  // Airport dots
+  const dotEl=document.getElementById('cityDots');dotEl.innerHTML='';
+  const seen=new Set();
+  flights.forEach(f=>{
+    [[f.from,f.fromLat,f.fromLng,f.fromCity||f.from],[f.to,f.toLat,f.toLng,f.toCity||f.to]].forEach(([code,lat,lng,city])=>{
+      if(lat==null||seen.has(code))return;seen.add(code);
+      const [x,y]=mapProj([lng,lat]);
+      const g=document.createElementNS(ns,'g');
+      const ring=document.createElementNS(ns,'circle');ring.setAttribute('cx',x);ring.setAttribute('cy',y);ring.setAttribute('r',6);ring.setAttribute('fill','rgba(255,200,68,.12)');g.appendChild(ring);
+      const dot=document.createElementNS(ns,'circle');dot.setAttribute('cx',x);dot.setAttribute('cy',y);dot.setAttribute('r',3.5);dot.setAttribute('class','city-dot');
+      const ti=document.createElementNS(ns,'title');ti.textContent=`${code} · ${city}`;dot.appendChild(ti);g.appendChild(dot);
+      dotEl.appendChild(g);
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// VIDEO
+// ══════════════════════════════════════════════════════════════
+let vidYear='all',vidFrame=null,vidProgress=0,vidPaused=false,vidLastTs=null;
+const VID_DUR=10000;
+
+function updateYearPills(){
+  const yrs=[...new Set(flights.map(f=>f.year))].sort();
+  document.getElementById('yearPills').innerHTML=
+    `<div class="yr-pill ${vidYear==='all'?'on':''}" onclick="selYear('all')">ALL</div>`+
+    yrs.map(y=>`<div class="yr-pill ${vidYear==y?'on':''}" onclick="selYear(${y})">${y}</div>`).join('');
+}
+function selYear(y){vidYear=y;updateYearPills();resetVid();}
+
+function getVidFlights(){
+  return(vidYear==='all'?flights:flights.filter(f=>f.year==vidYear))
+    .filter(f=>f.fromLat!=null&&f.toLat!=null)
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+}
+
+function ll2canvas(lat,lng,W,H){return{x:(lng+180)/360*W,y:(90-lat)/180*H};}
+
+function drawVidFrame(progress){
+  const canvas=document.getElementById('videoCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const fs=getVidFlights();
+
+  // BG
+  ctx.fillStyle='#04091a';ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle='rgba(0,200,255,.05)';ctx.lineWidth=.5;
+  for(let i=0;i<=12;i++){ctx.beginPath();ctx.moveTo(i*W/12,0);ctx.lineTo(i*W/12,H);ctx.stroke();}
+  for(let i=0;i<=6;i++){ctx.beginPath();ctx.moveTo(0,i*H/6);ctx.lineTo(W,i*H/6);ctx.stroke();}
+
+  // Equator
+  ctx.strokeStyle='rgba(0,200,255,.15)';ctx.lineWidth=1;ctx.setLineDash([4,8]);
+  ctx.beginPath();ctx.moveTo(0,H/2);ctx.lineTo(W,H/2);ctx.stroke();ctx.setLineDash([]);
+
+  // Watermark
+  const lbl=vidYear==='all'?'ALL TIME':String(vidYear);
+  ctx.font=`bold ${H*0.14}px Bebas Neue,sans-serif`;
+  ctx.fillStyle='rgba(0,200,255,.05)';
+  ctx.fillText(lbl,W-20-ctx.measureText(lbl).width,H-20);
+
+  // Account name
+  ctx.font=`${H*0.04}px Bebas Neue,sans-serif`;
+  ctx.fillStyle='rgba(0,200,255,.2)';
+  ctx.fillText(`FLIGHTLOG · ${currentAccount||''}`,20,36);
+
+  if(fs.length===0){
+    ctx.font='14px Share Tech Mono,monospace';ctx.fillStyle='rgba(0,200,255,.4)';
+    ctx.fillText('NO FLIGHTS WITH COORDINATES',30,H/2);return;
+  }
+
+  const total=fs.length,cur=progress*total;
+  for(let i=0;i<Math.floor(cur);i++)drawArc(ctx,fs[i],W,H,1,i,total);
+  const fi=Math.floor(cur);
+  if(fi<total)drawArc(ctx,fs[fi],W,H,cur-fi,fi,total);
+
+  // Stats
+  ctx.font='12px Share Tech Mono,monospace';ctx.fillStyle='rgba(0,200,255,.6)';
+  ctx.fillText(`${Math.min(Math.ceil(cur),total)}/${total} FLIGHTS`,16,H-14);
+  const km=fs.slice(0,Math.ceil(cur)).reduce((s,f)=>s+(f.km||0),0);
+  ctx.fillText(`${Math.round(km/1000)}K KM`,180,H-14);
+}
+
+function drawArc(ctx,f,W,H,frac,idx,total){
+  const p1=ll2canvas(f.fromLat,f.fromLng,W,H),p2=ll2canvas(f.toLat,f.toLng,W,H);
+  const hue=(idx/total*120+190)%360,color=`hsl(${hue},90%,65%)`;
+  const mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2-H*0.12;
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.shadowColor=color;ctx.shadowBlur=8;ctx.globalAlpha=.75;
+  if(frac<1){
+    const t=frac,bx=(1-t)*p1.x+t*mx,by=(1-t)*p1.y+t*my;
+    const cx_=(1-t)*mx+t*p2.x,cy_=(1-t)*my+t*p2.y;
+    const ex=(1-t)*bx+t*cx_,ey=(1-t)*by+t*cy_;
+    ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.quadraticCurveTo(bx,by,ex,ey);ctx.stroke();
+    ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.shadowBlur=16;ctx.shadowColor='#fff';
+    ctx.beginPath();ctx.arc(ex,ey,3.5,0,Math.PI*2);ctx.fill();
+  } else {
+    ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.quadraticCurveTo(mx,my,p2.x,p2.y);ctx.stroke();
+    ctx.globalAlpha=1;ctx.fillStyle=color;ctx.shadowBlur=10;ctx.shadowColor=color;
+    ctx.beginPath();ctx.arc(p2.x,p2.y,4,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+
+function animLoop(ts){
+  if(!vidLastTs)vidLastTs=ts;
+  if(!vidPaused)vidProgress=Math.min(vidProgress+(ts-vidLastTs)/VID_DUR,1);
+  vidLastTs=ts;
+  drawVidFrame(vidProgress);
+  document.getElementById('vidProg').style.width=(vidProgress*100)+'%';
+  if(vidProgress<1&&!vidPaused){vidFrame=requestAnimationFrame(animLoop);}
+  else if(vidProgress>=1&&isRecording){setTimeout(()=>stopRec(),400);}
+}
+function playVid(){if(vidProgress>=1)resetVid();vidPaused=false;vidLastTs=null;if(vidFrame)cancelAnimationFrame(vidFrame);vidFrame=requestAnimationFrame(animLoop);}
+function pauseVid(){vidPaused=!vidPaused;if(!vidPaused){vidLastTs=null;vidFrame=requestAnimationFrame(animLoop);}}
+function resetVid(){if(vidFrame)cancelAnimationFrame(vidFrame);vidProgress=0;vidPaused=false;vidLastTs=null;document.getElementById('vidProg').style.width='0%';drawVidFrame(0);}
+
+// Recording
+let mediaRecorder=null,recChunks=[],isRecording=false;
+function toggleRec(){isRecording?stopRec():startRec();}
+function startRec(){
+  const canvas=document.getElementById('videoCanvas');
+  if(!window.MediaRecorder){toast(t('rec_unsupported'));return;}
+  const mimes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+  const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
+  recChunks=[];
+  const stream=canvas.captureStream(30);
+  mediaRecorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8_000_000});
+  mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data);};
+  mediaRecorder.onstop=()=>{
+    const ext=mime.includes('mp4')?'mp4':'webm';
+    const blob=new Blob(recChunks,{type:mime});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=`flightlog-${currentAccount}-${vidYear}.${ext}`;a.click();
+    isRecording=false;
+    document.getElementById('recBtn').classList.remove('recording');
+    document.getElementById('recBtn').textContent=t('rec_download');
+    document.getElementById('recStatus').textContent='';
+    toast(t('rec_done'));
+  };
+  mediaRecorder.start(100);
+  isRecording=true;
+  document.getElementById('recBtn').classList.add('recording');
+  document.getElementById('recBtn').textContent='■ '+t('pause');
+  document.getElementById('recStatus').textContent=t('rec_hint');
+  resetVid();setTimeout(()=>playVid(),120);
+}
+function stopRec(){if(mediaRecorder&&mediaRecorder.state!=='inactive'){mediaRecorder.stop();if(vidFrame)cancelAnimationFrame(vidFrame);}}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+updateAccountCounts();
+document.getElementById('acLabel').textContent=t('select_account');
+
+// Auto-restore last account
+const lastAc=localStorage.getItem('fl_last_account');
+if(lastAc&&ACCOUNTS[lastAc]){
+  selectAccount(lastAc);
+}
+</script>
+</body>
+</html>
